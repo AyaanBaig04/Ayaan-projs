@@ -1,0 +1,389 @@
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Queue;
+import java.util.Scanner;
+import java.util.Set;
+
+/**
+ * Program which takes a file input and outputs an html file with code for
+ * making a tag cloud
+ *
+ * @author Ayaan B. Ishor B.
+ */
+public final class TagCloud {
+
+    /**
+     * max occurrences of the words.
+     */
+    private static int max = 0;
+
+    /**
+     * minimum occurrences of words.
+     */
+    private static int min = Integer.MAX_VALUE;
+
+    /**
+     * Set of separators within sentences.
+     */
+    private static Set<Character> SEPARATORS = new HashSet<>();
+
+    /**
+     * queue for duplicates.
+     */
+    private static Queue<String> words = new LinkedList<>();
+
+    /**
+     * map to hold words and counts.
+     */
+    private static HashMap<String, Integer> map = new HashMap<String, Integer>();
+
+    /**
+     * Comparator to sort alphabetically.
+     */
+    private static class StringSort
+            implements Comparator<Map.Entry<String, Integer>> {
+
+        @Override
+        public int compare(Map.Entry<String, Integer> o1,
+                Map.Entry<String, Integer> o2) {
+            int val;
+            val = o1.getKey().compareToIgnoreCase(o2.getKey());
+            if (val == 0) {
+                val = o2.getValue().compareTo(o1.getValue());
+            }
+            return val;
+        }
+    }
+
+    /**
+     * Compares two integers (All comparators are from sorting machine slides).
+     *
+     * @return greatest to smallest order
+     */
+    protected static class IntegerSort
+            implements Comparator<Map.Entry<String, Integer>> {
+        @Override
+        public int compare(Map.Entry<String, Integer> o1,
+                Map.Entry<String, Integer> o2) {
+            int val;
+            val = o2.getValue().compareTo(o1.getValue());
+            if (val == 0) {
+                val = o1.getKey().compareTo(o2.getKey());
+            }
+            return val;
+        }
+    }
+
+    /**
+     * fill the map of words and their counts.
+     */
+    public static void mapFill() {
+        for (String s : words) {
+            if (!map.containsKey(s)) {
+                map.put(s, 1);
+            } else {
+                int v = map.remove(s);
+                map.put(s, v + 1);
+            }
+
+        }
+
+    }
+
+    /**
+     * Separates the string into words and enqueues it into the queue of words.
+     *
+     * @param text
+     *            String of all characters from the inputed file
+     */
+    public static void nextWordOrSeparator(String text) {
+        String newString = "";
+        for (int i = 0; i < text.length(); i++) {
+            if (!SEPARATORS.contains(text.charAt(i))) {
+                newString += text.charAt(i);
+            } else if (!newString.isEmpty()) {
+
+                words.add(newString.toLowerCase());
+                newString = "";
+            }
+        }
+
+    }
+
+    /**
+     * Sorts map, highest to lowest, by Count.
+     *
+     * @return Sorted map in descending counts
+     */
+    public static List<Entry<String, Integer>> sortCount(int n) {
+        Comparator<Map.Entry<String, Integer>> countOrder = new IntegerSort();
+
+        List<Map.Entry<String, Integer>> count = new LinkedList<Map.Entry<String, Integer>>(
+                map.entrySet());
+
+        List<Map.Entry<String, Integer>> sorted = count.subList(0, n);
+        Collections.sort(sorted, countOrder);
+
+        return sorted;
+
+    }
+
+    /**
+     * Sorts the map alphabetically.
+     *
+     * @param countSorted
+     *            Map sorted by count
+     * @param n
+     *            Number of words to be sorted
+     * @return Alphabetically sorted Map.
+     */
+    public static List<Entry<String, Integer>> sortAlphabet(
+            List<Entry<String, Integer>> countSorted, int n) {
+
+        Comparator<Map.Entry<String, Integer>> alphabetOrder = new StringSort();
+
+        Collections.sort(countSorted, alphabetOrder);
+
+        for (Entry<String, Integer> e : countSorted) {
+            if (e.getValue() < min) {
+                min = e.getValue();
+            }
+            if (e.getValue() > max) {
+                max = e.getValue();
+            }
+        }
+
+        return countSorted;
+
+    }
+
+    /**
+     * Opens the file and returns all lines as one string.
+     *
+     * @param fileName
+     *            name of the file to be opened
+     * @return all words and characters of the file in one string.
+     */
+    public static String readFileText(String fileName) {
+        StringBuilder str = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new FileReader(fileName))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                str.append(line).append(" ");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return str.toString();
+    }
+
+    /**
+     *
+     * @param min
+     *            minimum occurrences in n top most occurred words
+     * @param max
+     *            maximum occurrences in n top most occurred words
+     * @param n
+     *            n most occurred words in the sortingMachine
+     * @return corresponding font size
+     *
+     */
+    public static int font(int min, int max, int n) {
+        final int maxFont = 48;
+        final int minFont = 11;
+
+        int font = maxFont - minFont;
+        font *= (n - min);
+        if (max != min) {
+            font /= (max - min);
+        }
+        font += minFont;
+
+        return font;
+
+    }
+
+    /**
+     * Prints header of html file.
+     *
+     * @param out
+     *            prints to html
+     * @param n
+     *            number of words in tag cloud
+     * @param name
+     *            name of html site
+     */
+    public static void header(PrintWriter out, int n, String name) {
+        out.println("<html>");
+        out.println("<head>");
+        out.println("<title>Top " + n + " words in " + name + "</title>");
+        out.println(
+                "<link href='http://web.cse.ohio-state.edu/software/2231/web-sw2/assignments/projects/tag-cloud-generator/data/tagcloud.css' rel='stylesheet' type='text/css'>");
+        out.println(
+                "<link href='tagcloud.css' rel='stylesheet' type='text/css'>");
+        out.println("</head>");
+    }
+
+    /**
+     * Prints contents of html site.
+     *
+     * @param out
+     *            prints to html
+     * @param n
+     *            number of words wanted in tag cloud
+     * @param name
+     *            Name of the file
+     * @param alphabetSorted
+     *            Alphabetically sorted map of words and counts within input
+     *            file
+     */
+    public static void content(PrintWriter out, int n, String name,
+            List<Entry<String, Integer>> alphabetSorted) {
+        int num = 0;
+        out.println("<body>");
+        out.println("<h2>Top " + n + " words in " + name + "</h2>");
+        out.println("<hr>");
+        out.println("<div class='cdiv'>");
+        out.println("<p class='cbox'>");
+        for (Entry<String, Integer> x : alphabetSorted) {
+            if (num == n) {
+                return;
+            }
+            int font = font(min, max, x.getValue());
+            out.println("<span class='f" + font + "'>"
+                    + x.getKey().toLowerCase() + "</span>");
+            num++;
+        }
+        out.println("</p>");
+        out.println("</div>");
+        out.println("</body>");
+        out.println("</html>");
+    }
+
+    /**
+     * Fills SEPARATORS.
+     */
+    public static void separators() {
+        SEPARATORS.add(',');
+        SEPARATORS.add('.');
+        SEPARATORS.add(' ');
+        SEPARATORS.add('$');
+        SEPARATORS.add('-');
+        SEPARATORS.add('[');
+        SEPARATORS.add(']');
+        SEPARATORS.add('#');
+        SEPARATORS.add('`');
+        SEPARATORS.add('&');
+        SEPARATORS.add('!');
+        SEPARATORS.add('~');
+        SEPARATORS.add('/');
+        SEPARATORS.add('\'');
+        SEPARATORS.add('*');
+        SEPARATORS.add('?');
+        SEPARATORS.add('0');
+        SEPARATORS.add('1');
+        SEPARATORS.add('2');
+        SEPARATORS.add('3');
+        SEPARATORS.add('4');
+        SEPARATORS.add('5');
+        SEPARATORS.add('6');
+        SEPARATORS.add('7');
+        SEPARATORS.add('8');
+        SEPARATORS.add('9');
+        SEPARATORS.add(';');
+        SEPARATORS.add('_');
+        SEPARATORS.add(':');
+    }
+
+    /**
+     * Main method.
+     *
+     * @param args
+     *            the command line arguments; unused here
+     */
+    public static void main(String[] args) throws IOException {
+        // Prompt client
+        Scanner scanner = new Scanner(System.in);
+        //    BufferedReader reader = null;
+        //    PrintWriter writer = null;
+
+        System.out.println("Enter the Name of Your input file: ");
+        String inputFile = scanner.nextLine();
+
+        System.out.println(
+                "Enter number of words to be included in the generated tag cloud (0-2147483647)");
+        int n = 0;
+        String num = scanner.nextLine();
+        try {
+            n = Integer.parseInt(num);
+        } catch (NumberFormatException e) {
+            System.err.print("Could not convert given value to int");
+            scanner.close();
+            return;
+        }
+
+        System.out.println("Enter the name of your output file: ");
+        String outputFile = scanner.nextLine();
+
+        // Handle input and output
+        try {
+            BufferedReader reader = new BufferedReader(
+                    new FileReader(inputFile));
+
+            separators();
+
+            nextWordOrSeparator(readFileText(inputFile));
+
+            mapFill();
+
+            // close reader
+            reader.close();
+
+        } catch (IOException e) {
+            System.err.println("could not open input file");
+            scanner.close();
+            return;
+        }
+
+        try {
+            PrintWriter writer = new PrintWriter(new FileWriter(outputFile));
+
+            //sort maps with comparators
+
+            List<Entry<String, Integer>> countSorted = sortCount(n);
+
+            List<Entry<String, Integer>> alphabetSorted = sortAlphabet(
+                    countSorted, n);
+
+            //creates HTML
+
+            header(writer, n, inputFile);
+
+            content(writer, n, inputFile, alphabetSorted);
+
+            //close writer
+            writer.close();
+
+        } catch (IOException e) {
+            System.err.println("could not open output file");
+            scanner.close();
+            return;
+        }
+
+        //close scanners and output
+        scanner.close();
+
+    }
+}
