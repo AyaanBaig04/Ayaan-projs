@@ -1,0 +1,268 @@
+import java.util.Comparator;
+import components.map.Map;
+import components.map.Map.Pair;
+import components.map.Map1L;
+import components.queue.Queue;
+import components.queue.Queue1L;
+import components.simplereader.SimpleReader;
+import components.simplereader.SimpleReader1L;
+import components.simplewriter.SimpleWriter;
+import components.simplewriter.SimpleWriter1L;
+
+/**
+ * Project which inputs a specific sentence and outputs it into an html glossary, where each           *term is linked to its glossary
+ */
+public final class Glossary {
+
+    /**
+     * Private constructor so this utility class cannot be instantiated.
+     */
+    public Glossary() {
+    }
+
+    /**
+     * Takes the term and prints the definition into the .html file with links
+     * to any word in the definition which is also in the glossary
+     *
+     * @param key
+     *            the term with the definition to be printed
+     * @param map
+     *            Map<> with definitions for the key
+     * @param path
+     *            name of the folder in which the files are saved
+     * @param keys
+     *            words which must be linked if they appear in the definitions
+     * @requires map to not be empty, keys to not be empty, key to not be null,
+     *           path to not be null
+     * @ensures html file is printed with term + definitions and linked terms
+     */
+    public static void wordPrint(String key, Map<String, String> map,
+            String path, Queue<String> keys) {
+
+        //make file for term
+        String fileName = key + ".html";
+        SimpleWriter out = new SimpleWriter1L(path + "/" + fileName);
+
+        //print header to term
+
+        out.println("<html>");
+        out.println("<head>");
+        out.println("<title>" + key + "</title>");
+        out.println("</head>");
+        out.println("<body>");
+        out.println("<h2><b><i><font color=\"red\">" + key
+                + "</font></i></b></h2>");
+        out.print("<blockquote>");
+
+        //print definition with embedded term links
+
+        String def = map.value(key);
+
+        for (String word : keys) {
+            int start = def.indexOf(word);
+            if (start > -1) {
+                String def1 = def.substring(0, start);
+                start += word.length();
+                if (!(start > def.length() - 1)) {
+                    String def2 = def.substring(start, def.length());
+                    def = def1 + "<a href=\"" + word + ".html\">" + word
+                            + "</a>" + def2;
+                } else {
+                    def = def1 + "<a href=\"" + word + ".html\">" + word
+                            + "</a>";
+                }
+            }
+
+        }
+
+        //print footer
+
+        out.print(def);
+        out.print("</blockquote>");
+        out.println();
+        out.println("<hr />");
+        out.println("<p>Return to <a href=\"index.html\">index</a>.</p>");
+        out.println("</body>");
+        out.println("</html>");
+
+        out.close();
+
+    }
+
+    /**
+     * Takes the term and prints the definition into the .html file with links
+     * to any word in the definition which is also in the glossary
+     *
+     * @param map
+     *            needed to be sent to method wordPrint
+     * @param path
+     *            name of the folder in which the files are saved
+     * @param key
+     *            Queue<> of terms
+     * @requires map to not be empty, key to not be empty, path to not be null
+     * @ensures html file is printed with term + definitions and linked terms
+     */
+    public static void glossPrint(Queue<String> key, Map<String, String> map,
+            String path) {
+
+        //create html file
+        String gloss = "index.html";
+        SimpleWriter out = new SimpleWriter1L(path + "/" + gloss);
+
+        //print header
+        out.println("<html>");
+        out.println("<head>");
+        out.println("<title>Glossary</title>");
+        out.println("</head>");
+        out.println("<body>");
+        out.println("<h2>Glossary</h2>");
+        out.println("<hr />");
+        out.println("<h3>Index</h3>");
+        out.println("<ul>");
+
+        //send to wordPrint to make files for terms
+        for (String word : key) {
+            out.println(
+                    "<li><a href=\"" + word + ".html\">" + word + "</a></li>");
+            wordPrint(word, map, path, key);
+        }
+
+        //print footer
+        out.println("</ul>");
+        out.println("</body>");
+        out.println("</html>");
+
+        out.close();
+    }
+
+    /**
+     * Comparator from the lab
+     */
+
+    public static class sort implements Comparator<String> {
+        @Override
+
+        public int compare(String temp1, String temp2) {
+            return temp1.compareTo(temp2);
+        }
+    }
+
+    /**
+     * fills key with terms and then arranges them alphabetically
+     *
+     * @param map
+     *            Map<> with all terms and definitions
+     * @param key
+     *            Queue<> of terms
+     * @requires map to not be empty
+     * @ensures key is filled alphabetically
+     */
+
+    public static void qCorrect(Map<String, String> map, Queue<String> key) {
+
+        //fill key with terms
+
+        for (Pair<String, String> pair : map) {
+            String word = pair.key();
+            key.enqueue(word);
+        }
+
+        //initialize Comparator
+
+        Comparator<String> sort = new sort();
+
+        //alphabetize key
+
+        key.sort(sort);
+    }
+
+    /**
+     * fills map with terms corresponding definitions
+     *
+     * @param map
+     *            Map<> with all terms and definitions
+     * @param fileName
+     *            name of text file with glossary terms and definitions
+     * @requires fileName to not be null and must be .txt file
+     * @ensures map is filled
+     */
+    public static void mapFill(Map<String, String> map, String fileName) {
+
+        //open file
+
+        SimpleReader file = new SimpleReader1L(fileName);
+
+        //while loop to fill map with terms and definitions from the glossary
+
+        String word = "";
+        String def = "";
+        String line = "";
+        boolean start = true;
+
+        while (!file.atEOS()) {
+
+            line = file.nextLine();
+
+            if (start) {
+                word = line;
+                start = false;
+            } else if (line.isEmpty()) {
+                map.add(word, def);
+                word = "";
+                def = "";
+                start = true;
+            } else {
+                def += line;
+            }
+
+        }
+
+        //add last term and definition
+
+        map.add(word, def);
+
+        file.close();
+    }
+
+    /**
+     * Main method.
+     *
+     * @param args
+     *            the command line arguments; unused here
+     */
+
+    public static void main(String[] args) {
+        /*
+         * Open input and output streams
+         */
+        SimpleReader in = new SimpleReader1L();
+        SimpleWriter out = new SimpleWriter1L();
+
+        //get file name
+
+        out.print("Enter name of text file: ");
+        String fileName = in.nextLine();
+
+        out.println();
+
+        //get path name
+
+        out.print("Enter name of output path: ");
+        String path = in.nextLine();
+
+        //initialize empty map and queue
+
+        Map<String, String> def = new Map1L<String, String>();
+        Queue<String> key = new Queue1L<String>();
+
+        //send everything to methods
+
+        mapFill(def, fileName);
+        qCorrect(def, key);
+        glossPrint(key, def, path);
+
+        in.close();
+        out.close();
+    }
+
+}
