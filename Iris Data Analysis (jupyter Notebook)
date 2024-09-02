@@ -1,0 +1,89 @@
+import pandas as pd
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+df = pd.read_csv('iris.csv')
+df.head()
+
+df.describe()
+#displays the data stats
+
+df.info()
+
+#checking for null
+df.isnull().sum()
+
+df['sepal.length'].hist()
+
+df['sepal.width'].hist()
+
+df['petal.length'].hist()
+
+df['petal.width'].hist()
+
+#scatter plot
+colors = ['red', 'green', 'blue']
+species = ['Virginica', 'Versicolor', 'Setosa']
+
+for i in range(3):
+    x = df[df['variety'] == species[i]]
+    plt.scatter(x['sepal.length'], x['sepal.width'], c = colors[i], label = species[i])
+
+    plt.xlabel('Sepal Length, cm')
+    plt.ylabel('sepal Width, cm')
+
+for i in range(3):
+    x = df[df['variety'] == species[i]]
+    plt.scatter(x['petal.length'], x['petal.width'], c = colors[i], label = species[i])
+
+    plt.xlabel('petal Length, cm')
+    plt.ylabel('petal Width, cm')
+
+for i in range(3):
+    x = df[df['variety'] == species[i]]
+    plt.scatter(x['sepal.length'], x['petal.length'], c = colors[i], label = species[i])
+
+    plt.xlabel('sepal length, cm')
+    plt.ylabel('petal length, cm')
+    plt.legend()
+
+for i in range(3):
+    x = df[df['variety'] == species[i]]
+    plt.scatter(x['sepal.width'], x['petal.width'], c = colors[i], label = species[i])
+
+    plt.xlabel('sepal Width, cm')
+    plt.ylabel('petal Width, cm')
+
+corr = df.corr()
+fig, ax = plt.subplots(figsize=(3,3))
+sns.heatmap(corr, annot = True, ax = ax)
+
+from sklearn.preprocessing import LabelEncoder
+le = LabelEncoder()
+
+df['variety'] = le.fit_transform(df['variety'])
+df.head()
+
+from sklearn.model_selection import train_test_split
+#train - 70
+#testing - 30
+x = df.drop(columns = ['variety'])
+y = df['variety']
+x_train, x_test, y_train, y_test =  train_test_split(x, y, test_size = 0.3)
+
+#logistic regression
+from sklearn.linear_model import LogisticRegression 
+model = LogisticRegression()
+#model training
+model.fit(x_train, y_train)
+
+#print metric to get performance
+print("Accuracy: ", model.score(x_test, y_test) * 100)
+
+#testing with knn model
+from sklearn.neighbors import KNeighborsClassifier
+model = KNeighborsClassifier()
+model.fit(x_train, y_train)
+print("Accuracy: ", model.score(x_test, y_test) * 100)
