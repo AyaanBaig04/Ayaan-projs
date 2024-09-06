@@ -1,3 +1,5 @@
+#Code based on video by Hacker's Realm, used for practice with analytical tools.
+
 import pandas as pd
 import numpy as np
 import os
