@@ -1,4 +1,11 @@
 #Code based on MIT GPT, and Andrej Karpathy's youtube video on creating transformers.
+#original output
+#thingivoiThat s:Dorian shooked.
+#“Oh! so, Mr . Gray . He hast ruggardeners had once not do, who hearing to back to
+#know whom as almost the devot a grey-shole upersisted and the lay of
+#terror the bile moment, with a shad touch puddled hange. He door, after the the black shadow as
+#the grass of a moment and there dree
+#if the shound, he went in a
 
 import PyPDF2
 import PyPDF2
@@ -26,7 +33,7 @@ torch.manual_seed(2024)
 #opening texts
 text = ""
 #The Mysterious Stranger
-pdfFileObj = open(r'C:\Users\ayaan\PycharmProjects\AM Script\The Project Gutenberg Book of The Mysterious Stranger and Other Stories, by Mark Twain.pdf', 'rb') #read as binary
+pdfFileObj = open(r'C:\AM Script\The Project Gutenberg Book of The Mysterious Stranger and Other Stories, by Mark Twain.pdf', 'rb') #read as binary
 pdfReader = PyPDF2.PdfReader(pdfFileObj)
 for page in range(len(pdfReader.pages)):
     pageObj = pdfReader.pages[page]
@@ -34,7 +41,7 @@ for page in range(len(pdfReader.pages)):
 pdfFileObj.close()
 
 #Paradise Lost
-pdfFileObj = open(r'C:\Users\ayaan\PycharmProjects\AM Script\The Project Gutenberg eBook of Paradise Lost, by John Milton.pdf', 'rb') #read as binary
+pdfFileObj = open(r'C:\AM Script\The Project Gutenberg eBook of Paradise Lost, by John Milton.pdf', 'rb') #read as binary
 pdfReader = PyPDF2.PdfReader(pdfFileObj)
 for page in range(len(pdfReader.pages)):
     pageObj = pdfReader.pages[page]
@@ -42,7 +49,7 @@ for page in range(len(pdfReader.pages)):
 pdfFileObj.close()
 
 #Dorian Gray
-pdfFileObj = open(r'C:\Users\ayaan\PycharmProjects\AM Script\The Project Gutenberg eBook of The Picture of Dorian Gray, by Oscar Wilde.pdf', 'rb') #read as binary
+pdfFileObj = open(r'C:\AM Script\The Project Gutenberg eBook of The Picture of Dorian Gray, by Oscar Wilde.pdf', 'rb') #read as binary
 pdfReader = PyPDF2.PdfReader(pdfFileObj)
 for page in range(len(pdfReader.pages)):
     pageObj = pdfReader.pages[page]
