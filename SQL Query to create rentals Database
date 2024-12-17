@@ -1,0 +1,84 @@
+Create Table MANUFACTURER
+(Name varchar(15) not null, Address varchar(20), Type varchar(15), primary key(Name));
+
+Create Table WAREHOUSE
+(Drone_Capacity int, Equipment_Capacity int, Phone_Number int, 
+Address varchar(50) not null, City varhcar(20) not null, Community varchar(20), 
+primary key(Address));
+
+Create Table EQUIPMENT
+(Manufacturer varchar(20), Year int, Warranty_Expiration int, Name varchar(20), Model varchar(20), 
+SerialNum char(10) not Null,
+Equipment_Status varchar(5), Equipment_Availability varchar(5), 
+Equpment_Arrival_Date varchar(11), Size int, Weight int, 
+Equpment_Type varchar(15), Location varchar(50), primary key(SerialNum), 
+foreign key(Manufacturer) references MANUFACTURER(Name) on update cascade, 
+foreign key(Location) references WAREHOUSE(Address) on update cascade);
+
+Create Index EWeight on EQUIPMENT(Weight);
+
+Create Table DRONE
+(Manufacturer varchar(20), Year int, Warranty_Expiration varchar(8), 
+Name varchar(20), Model_Number varchar(20), SerialNum varchar(15) not Null, 
+Max_Speed int, Weight_Capacity int, Volume_Capacity int, Drone_Status varchar(5),
+Drone_Arrival_Date varchar(11), Drone_Availability varchar(5), Location varchar(50), 
+primary key(SerialNum), foreign key(Manufacturer) references MANUFACTURER(Name) on update cascade,
+foreign key(Location) references WAREHOUSE(Address) on update cascade);
+
+Create Index DWeight on DRONE(Weight_Capacity);
+
+Create Table CUSTOMER
+(Customer_Id int not null, Start_Date varchar(11), IDStatus varchar(5), 
+FName varchar(15), LName varchar(15), primary key(Customer_Id));
+
+Create Table CUST_PHONE
+(Phone int not null, Customer_Id int not null, primary key(Phone), 
+foreign key(Customer_Id) references CUSTOMER(Customer_Id) on update cascade);
+
+Create Table EMPLOYEE
+(SSN int not null, Position varchar(20), FName varchar(15), LName varchar(15), 
+Salary int, Address varchar(50), Manager_SSN int, primary key(SSN));
+
+
+Create Index ISalary on EMPLOYEE(Salary);
+
+Create Table EMP_PHONE
+(Phone int not null, SSN int not null, primary key(Phone), 
+foreign key(SSN) references EMPLOYEE(SSN) on update cascade);
+
+Create Table DISTANCE
+(Address varchar(20) not null, Distance int, Customer_Id int not null,  Warehouse varchar(50) not null, 
+primary key(Address, Customer_Id),
+foreign key(Customer_Id) references CUSTOMER(Customer_Id) on update cascade, 
+foreign key(Warehouse) references WAREHOUSE(Address) on update cascade);
+
+Create Table CUST_EMAIL
+ (Customer_Id int not null, Email varchar(20) not null,  primary key(Email), 
+foreign key(Customer_Id) references CUSTOMER(Customer_Id) on update cascade);
+
+Create Table REVIEWS
+(Customer_Id int not null, SerialNum varchar(15) not null, 
+Reviews int, Comments TEXT, primary key(Customer_Id, SerialNum), 
+foreign key(Customer_Id) references CUSTOMER(Customer_Id) on update cascade,  
+foreign key(SerialNum) references EQUIPMENT(SerialNum) on update cascade);
+
+Create Table PURCHASE_ORDER
+(Order_Num int not null, Value int, 
+Est_Arr_Date varchar(11), Act_Arr_Date varchar(11),
+Address varchar(20), primary key(Order_Num));
+
+Create Table RENTALS 
+(ESerialNum varchar(10) not null, Customer_Id int not null, Order_Num int not null,
+DSerialNum varchar(15) not null, Due_Date varchar(11), Checkout_Date varchar(11),
+primary key(Order_Num), 
+foreign key(ESerialNum) references EQUIPMENT(SerialNum) on update cascade,  
+foreign key(Customer_Id) references CUSTOMER(Customer_Id) on update cascade,
+foreign key(DSerialNum) references DRONE(SerialNum) on update cascade, 
+foreign key(Order_Num) references PURCHASE_ORDER(Order_Num) on update cascade);
+
+Create Table PENALTIES
+(Order_Num int not null, Customer_Id int not null, ESerialNum varchar(15) not null, 
+PaymentAmount int, Status varchar(5), primary key(Order_Num), 
+foreign key(Order_Num) references PURCHASE_ORDER(Order_Num) on update cascade, 
+foreign key(ESerialNum) references EQUIPMENT(SerialNum) on update cascade, 
+foreign key(Customer_Id) references CUSTOMER(Customer_Id) on update cascade);
