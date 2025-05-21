@@ -1,0 +1,390 @@
+---
+title: "Bayesian Investment Analysis for Stocks Data"
+author: "Ayaan Baig"
+date: "`r Sys.Date()`"
+output: pdf_document
+header-includes:
+   - \usepackage{setspace}
+   - \doublespacing
+---
+
+```{r, warning=FALSE, echo=FALSE,  include=FALSE}
+set.seed(3303)
+library(rjags)
+library(coda)
+library(readr)
+library(dplyr)
+```
+
+```{r, warning=FALSE, echo=FALSE,  include=FALSE}
+proj = read_csv("C:/Users/ayaan/OneDrive/Desktop/HW/Stat3303/dataset47.csv")
+```
+
+## Introduction:
+
+  Although the aphorism “past performance is no guarantee of future results” cautions against over-reliance on historical returns, empirical practice commonly uses observed returns to inform investment decisions. In this report, we approximate each stock’s behavior over successive periods as independent Bernoulli trials: in each period, a stock’s return is positive with probability $\theta$ and negative with probability 1 - $\theta$. This investigation's aim is to estimate the true $\theta$ for each of 30 flips, from 10 stocks companies in each of 5 sectors, while accounting for market-wide and sector-specific effects via a Bayesian hierarchical model. Then to determine which sector, and which stock within each sector, is most likely to deliver the highest probability of positive returns.
+
+## Exploratory Data Analysis:
+
+  The data-set comprises of 1500 observations: for each of the 5 market sectors, there are 10 stocks, each with 30 binary “flips”, where 1 denotes a positive return in period i. Table 1 summarizes the overall rates of positive returns by sector. Sector 3 exhibits the highest empirical rate of positive returns ($\sim$ 0.583), compared to the global average of 0.518. Within Sector 3, Stock 1 has the greatest sample mean (0.70).
+
+  A key limitation of modeling returns as Bernoulli observations is loss of magnitude information: a small gain and a large gain are treated equivalently. Another key limitation is the inability to use tradition confidence intervals, since they result in negative boundaries for probabilities, and are thus unhelpful.
+  
+### Figure 1: Average of each Market Sector
+```{r, echo=FALSE}
+#mean by sector
+(data.frame("Sector:" = c(1, 2, 3, 4, 5, "global"),
+"Mean:" = c( 
+mean(proj[proj$sector == 1,]$flip),
+mean(proj[proj$sector == 2,]$flip),
+mean(proj[proj$sector == 3,]$flip),
+mean(proj[proj$sector == 4,]$flip),
+mean(proj[proj$sector == 5,]$flip),
+mean(proj$flip)
+)))
+```
+
+### Figure 2: Average for stocks specific to market sector 3
+```{r, echo=FALSE}
+market3 <- proj[proj$sector == 3,]
+(data.frame("Stock:" = c(1:10), "Mean:" = c( mean(market3[market3$stock == 1,]$flip),
+mean(market3[market3$stock == 2,]$flip),
+mean(market3[market3$stock == 3,]$flip),
+mean(market3[market3$stock == 4,]$flip),
+mean(market3[market3$stock == 5,]$flip),
+mean(market3[market3$stock == 6,]$flip),
+mean(market3[market3$stock == 7,]$flip),
+mean(market3[market3$stock == 8,]$flip),
+mean(market3[market3$stock == 9,]$flip),
+mean(market3[market3$stock == 10,]$flip))))
+```
+
+## Model Description:
+
+  As shown in figure 3, The model is made by having $Y_{i = observation,s=stock,m=market}$, the "flips", conditionally dependent on each stock's probability, $theta_{s=stock,m=market}$. $logit(\theta_{s,m})$, which is transformed to capture normal market variation on the probability scale, is conditionally dependent on the market sector mean, $\mu_{m=market}$, and variance, $\sigma^2_{m=market}$. $\sigma_{m}$ has a vague, uniform prior taking values from 0 to 3. The range of 0 to 3 was chosen for the uniform distribution for standard deviations, as it allows for the normal distribution to reach the majority of the range of the $\theta_{s,m}$ when converted back to probabilities. $\mu_{m}$ is conditionally dependent on the global market mean, $\mu_{g=global market}$, which has the vague prior of a normal distribution centered on the logit transformed sample mean and a variance of 3. It is to note that the model assumes that each $Y_{i,s,m},\theta_{s.m},\mu_{m}, \sigma^2_{m}$, and $\mu_{g}$ are identically and independently distributed. 
+
+### Figure 3: Heirarchical Bayesian Model
+
+$$Y_{i,s,m}\sim_{iid}Bern(\theta_{s,m})$$
+$$Logit(\theta_{s,m}) \sim_{iid} N(\mu_{m}, \sigma^2_{m})$$
+$$\mu_{m}\sim_{iid} N(\mu_{g}, \sigma_{s}), \sigma_{m}\sim_{iid} unif(0,3)$$
+$$\mu_{g}\sim_{iid} N(logit(\bar{y}), 9),\sigma_{s}\sim_{iid} unif(0,3)$$
+## Model Fit and Diagnostics:
+  
+  The model was fit using an RJAGS MCMC algorithm with 15,000 iterations, the first 5,000 of which omitted as burn-in iterations. To better confirm convergence, 5 simultaneous start points were created for the algorithm. As visible in Figure 4, sector 3's posterior mean converges, via the marker test, where the algorithm generates posterior values closely around a line in the trace plot The posterior values are also distributed normally in the density plot on the right of Figure 4, indicating that the data is centered around specific posterior parameter value. From Figure 5, the trace plot for the market mean, and the trace plot for the market 3, stock 1 both converge via the marker test and density tests. The stock and sector standard deviations both pass the marker test, but their density plots appear different from a normal distribution since the prior for their variances were uniform distributions. 
+  
+### Figure 4: Plotted Trace Plot and Density for Market Sector 3 from Model
+
+```{r, echo=FALSE, warning=FALSE}
+
+proj$stock_id = with(proj,  # Neccesary to ensure each stock is separate though some share labels
+  (sector - 1) * 10 + stock
+)
+
+nstock = length(unique(proj$stock_id)) #50
+nsector = length(unique(proj$sector))   #5
+
+sector_of_stock <- tapply(proj$sector,
+                          proj$stock_id,
+                          unique)
+sector_of_stock <- as.integer(sector_of_stock)
+
+mydata <- list(
+  n = nrow(proj), 
+  y = proj$flip, 
+  stock = proj$stock_id,  
+  nstock = nstock,  
+  nsector = nsector,   
+  sector_of_stock = sector_of_stock,
+  logit_bar_y = qlogis(mean(proj$flip))
+)
+
+
+myinits <- function() {
+  mu.m_init <- rnorm(1, mydata$logit_bar_y, 3)
+  s.sect_init <- runif(1, 0, 3)
+  s.stk_init <- runif(1, 0, 3)
+  mu.sect_init <- rnorm(nsector, mu.m_init, s.sect_init)
+  theta_init <- sapply(1:nstock, function(i) {
+    rnorm(1,
+          mu.sect_init[ sector_of_stock[i] ],
+          s.stk_init)
+  })
+  list(
+    mu.market = mu.m_init,
+    sigma.sect = s.sect_init,
+    sigma.stock = s.stk_init,
+    mu.sect = mu.sect_init,
+    theta = theta_init
+  )
+}
+
+mymodel <- "
+model {
+  # Hyperpriors
+  mu.market   ~ dnorm(logit_bar_y, 1/9) 
+  sigma.sect  ~ dunif(0,3) # SD of sector effects
+  sigma.stock ~ dunif(0,3) # SD of stock effects
+
+  # Convert SD to precison
+  tau.sect  <- 1 / (sigma.sect * sigma.sect)
+  tau.stock <- 1 / (sigma.stock * sigma.stock)
+
+  # Sector level means
+  for(k in 1:nsector) {
+    mu.sect[k] ~ dnorm(mu.market, tau.sect)
+  }
+
+  # Stock level logits(theta)
+  for(j in 1:nstock) {
+    theta[j] ~ dnorm(mu.sect[ sector_of_stock[j] ], tau.stock)
+  }
+
+  # Likelihood: coin flips
+  for(i in 1:n) {
+    logit(p[i]) <- theta[ stock[i] ]
+    y[i] ~ dbern(p[i])
+  }
+}
+"
+
+# Compile 
+jmodel <- jags.model(
+  textConnection(mymodel),
+  data = mydata,
+  inits = myinits,
+  n.chains = 5,
+  n.adapt = 5000
+)
+
+# Burn in
+update(jmodel, 5000)
+
+# Draw samples
+samps <- coda.samples(
+  model = jmodel,
+  variable.names = c(
+    "mu.market",
+    "sigma.sect","sigma.stock",
+    "mu.sect","theta"
+  ),
+  n.iter         = 15000
+)
+
+# Inspect
+par(mfrow = c(2,2), mar = c(4,4,2,1)+0.1)
+plot(samps[,3])
+```
+### Figure 5: Trace and density plots for market mean, stock SD, and stock 1 sector 3
+
+```{r, echo=FALSE}
+par(mfrow = c(1,2), mar = c(4, 4, 2, 1) + 0.1)
+plot(samps[,c(1, 8, 29)])
+```
+
+## Results Interpretation:
+
+  Based on the values for $\theta$ seen in figure 6, and the credible intervals for the average posterior probability in figure 7, Market sector 3 has the highest probability for increasing returns on investment, with stock 1 of sector 3 having the highest return. These results confirm both the sample-based rankings and the hierarchical model expect stock 1, sector 3 to be the safest investment according to the limited data. However, the model's credible intervals provide more reliable ranges for probabilities than frequentist confidence intervals.
+
+### Figure 6: Boxplot of all Stock Posterior thetas, Colored by Sector in Order
+```{r, echo=FALSE, warning=FALSE}
+# Extract theta samples
+theta_samples <- as.matrix(samps)[, grep("^theta\\[", colnames(as.matrix(samps)))]
+
+# Apply inverse logit transform
+theta_prob_samples <- plogis(theta_samples)
+sector_colors = rainbow(length(unique(sector_of_stock)))[sector_of_stock]
+
+boxplot(theta_prob_samples,
+        main = "Posterior of Theta for Each Stock (Probability Scale)",
+        xlab = "Stock",
+        ylab = "Theta (Probability of Positive Flip)",
+        las = 2,                # Rotate stock labels vertically to fit
+        cex.axis = 0.5,          # Smaller axis labels
+        col = sector_colors,
+        outline = FALSE)         # Hide outliers for cleaner look
+```
+
+### Figure 7: Table of Credible Intervals for all Market Sector Posteriors, post Inverse Logit Transformation, and Stock 1, Sector 3
+
+```{r, echo=FALSE}
+# get the 2.5% and 97.5% quantiles for all mu.sect
+summ <- summary(samps, quantiles = c(0.025, 0.975))
+
+# retrieve rows corresponding to sectors from drawn samples
+ci_logit <- summ$quantiles[paste0("mu.sect[", 1:5, "]"), c("2.5%", "97.5%")]
+
+# transform to probability scale
+ci_prob <- apply(ci_logit, 2, plogis) # will apply inverse logit transform column‐wise
+ci_prob <- t(apply(ci_logit, 1, plogis)) # make the transformation rowwise
+rownames(ci_prob) <- paste0("Sector ", 1:5)
+
+# print table, 
+knitr::kable(ci_prob,
+             col.names = c("Lower 95% CI", "Upper 95% CI"),
+             caption = "95\\% Credible intervals for each sector (on probability scale)")
+
+theta_j <- as.matrix(samps)[, "theta[21]"]
+ci_logit <- quantile(theta_j, probs = c(0.025, 0.975))
+print("Stock 1, Sector 3:")
+plogis(ci_logit)
+```
+  
+## Appendix:
+
+```{r, libraries, warning=FALSE}
+library(rjags)
+library(coda)
+library(readr)
+library(dplyr)
+
+proj = read_csv("C:/Users/ayaan/OneDrive/Desktop/HW/Stat3303/dataset47.csv")
+
+#mean by sector
+(data.frame("Sector:" = c(1, 2, 3, 4, 5),
+"Mean:" = c( 
+mean(proj[proj$sector == 1,]$flip),
+mean(proj[proj$sector == 2,]$flip),
+mean(proj[proj$sector == 3,]$flip),
+mean(proj[proj$sector == 4,]$flip),
+mean(proj[proj$sector == 5,]$flip)
+)))
+
+#mean of stocks in specifc sector 3
+market3 <- proj[proj$sector == 3,]
+(data.frame("Stock:" = c(1:10), "Mean:" = c( mean(market3[market3$stock == 1,]$flip),
+mean(market3[market3$stock == 2,]$flip),
+mean(market3[market3$stock == 3,]$flip),
+mean(market3[market3$stock == 4,]$flip),
+mean(market3[market3$stock == 5,]$flip),
+mean(market3[market3$stock == 6,]$flip),
+mean(market3[market3$stock == 7,]$flip),
+mean(market3[market3$stock == 8,]$flip),
+mean(market3[market3$stock == 9,]$flip),
+mean(market3[market3$stock == 10,]$flip))))
+
+proj$stock_id = with(proj,  # Neccesary to ensure each stock is separate though some share labels
+  (sector - 1) * 10 + stock
+)
+
+nstock = length(unique(proj$stock_id)) #50
+nsector = length(unique(proj$sector))   #5
+
+sector_of_stock <- tapply(proj$sector,
+                          proj$stock_id,
+                          unique)
+sector_of_stock <- as.integer(sector_of_stock)
+
+mydata <- list(
+  n = nrow(proj), 
+  y = proj$flip, 
+  stock = proj$stock_id,  
+  nstock = nstock,  
+  nsector = nsector,   
+  sector_of_stock = sector_of_stock,
+  logit_bar_y = qlogis(mean(proj$flip))
+)
+
+
+myinits <- function() {
+  mu.m_init <- rnorm(1, mydata$logit_bar_y, 3)
+  s.sect_init <- runif(1, 0, 3)
+  s.stk_init <- runif(1, 0, 3)
+  mu.sect_init <- rnorm(nsector, mu.m_init, s.sect_init)
+  theta_init <- sapply(1:nstock, function(i) {
+    rnorm(1,
+          mu.sect_init[ sector_of_stock[i] ],
+          s.stk_init)
+  })
+  list(
+    mu.market = mu.m_init,
+    sigma.sect = s.sect_init,
+    sigma.stock = s.stk_init,
+    mu.sect = mu.sect_init,
+    theta = theta_init
+  )
+}
+
+mymodel <- "
+model {
+  # Hyperpriors
+  mu.market   ~ dnorm(logit_bar_y, 1/9) 
+  sigma.sect  ~ dunif(0,3) # SD of sector effects
+  sigma.stock ~ dunif(0,3) # SD of stock effects
+
+  # Convert SD to precison
+  tau.sect  <- 1 / (sigma.sect * sigma.sect)
+  tau.stock <- 1 / (sigma.stock * sigma.stock)
+
+  # Sector level means
+  for(k in 1:nsector) {
+    mu.sect[k] ~ dnorm(mu.market, tau.sect)
+  }
+
+  # Stock level logits(theta)
+  for(j in 1:nstock) {
+    theta[j] ~ dnorm(mu.sect[ sector_of_stock[j] ], tau.stock) #in model, theta is logit scale, different on outside
+  }
+
+  # Likelihood: coin flips
+  for(i in 1:n) {
+    logit(p[i]) <- theta[ stock[i] ]
+    y[i] ~ dbern(p[i])
+  }
+}
+"
+
+# Compile 
+jmodel <- jags.model(
+  textConnection(mymodel),
+  data = mydata,
+  inits = myinits,
+  n.chains = 5,
+  n.adapt = 5000
+)
+
+# Burn in
+update(jmodel, 5000)
+
+# Draw samples
+samps <- coda.samples(
+  model = jmodel,
+  variable.names = c(
+    "mu.market",
+    "sigma.sect","sigma.stock",
+    "mu.sect","theta"
+  ),
+  n.iter         = 15000
+)
+
+# Inspect
+par(mfrow = c(2,2), mar = c(4,4,2,1)+0.1)
+plot(samps)
+
+# Extract theta samples
+theta_samples <- as.matrix(samps)[, grep("^theta\\[", colnames(as.matrix(samps)))]
+
+# Apply inverse logit transform
+theta_prob_samples <- plogis(theta_samples)
+sector_colors = rainbow(length(unique(sector_of_stock)))[sector_of_stock]
+
+boxplot(theta_prob_samples,
+        main = "Posterior of Theta for Each Stock (Probability Scale)",
+        xlab = "Stock",
+        ylab = "Theta (Probability of Positive Flip)",
+        las = 2,                # Rotate stock labels vertically to fit
+        cex.axis = 0.5,          # Smaller axis labels
+        col = sector_colors,
+        outline = FALSE)         # Hide outliers for cleaner look
+
+summary(samps)
+
+# get the 2.5% and 97.5% quantiles 
+summ = summary(samps, quantiles = c(0.025, 0.975))
+
+# retrieve rows corresponding to sectors from drawn samples
+ci_logit = summ$quantiles[paste0("mu.sect[", 1:5, "]"), c("2.5%", "97.5%")]
+
+```
+
+
